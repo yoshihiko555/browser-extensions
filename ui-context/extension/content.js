@@ -145,13 +145,89 @@
     const el = e.target;
     // ハイライトがスクリーンショットに写らないよう、先に解除する
     setCaptureMode(false);
-    let comment = "";
-    try {
-      comment = window.prompt("キャプチャに付けるコメント (任意):") || "";
-    } catch (err) {
-      comment = "";
-    }
-    sendCapture(el, comment);
+    askComment().then((comment) => {
+      if (comment === null) return; // キャンセル
+      sendCapture(el, comment);
+    });
+  }
+
+  // コメント入力のオーバーレイ。ページの CSS に影響されないよう shadow DOM に置く。
+  // 送信は Cmd/Ctrl+Enter、キャンセルは Esc。キャンセルするとキャプチャは送らない。
+  // 解決値は入力文字列（空文字も可）、キャンセルなら null。
+  function askComment() {
+    return new Promise((resolve) => {
+      const host = document.createElement("div");
+      host.style.cssText = "all:initial;position:fixed;z-index:2147483647";
+      const root = host.attachShadow({ mode: "closed" });
+      root.innerHTML = `
+        <style>
+          :host { all: initial; }
+          .backdrop {
+            position: fixed; inset: 0; z-index: 1;
+            background: rgba(0,0,0,0.35);
+            display: flex; align-items: center; justify-content: center;
+            font-family: system-ui, -apple-system, sans-serif;
+          }
+          .panel {
+            background: #1e1e1e; color: #eee;
+            border: 1px solid #444; border-radius: 10px;
+            padding: 16px; width: min(520px, 90vw);
+            box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+          }
+          .title { font-size: 13px; color: #aaa; margin-bottom: 8px; }
+          textarea {
+            width: 100%; box-sizing: border-box; min-height: 96px;
+            background: #111; color: #eee; border: 1px solid #555;
+            border-radius: 6px; padding: 8px; font: inherit; font-size: 14px;
+            resize: vertical;
+          }
+          textarea:focus { outline: 2px solid #ff7a33; border-color: transparent; }
+          .row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+          .hint { font-size: 11px; color: #888; margin-right: auto; }
+          button {
+            font: inherit; font-size: 13px; padding: 6px 14px;
+            border-radius: 6px; border: 1px solid #555;
+            background: #2a2a2a; color: #eee; cursor: pointer;
+          }
+          button.primary { background: #ff7a33; border-color: #ff7a33; color: #201000; font-weight: 600; }
+        </style>
+        <div class="backdrop">
+          <div class="panel">
+            <div class="title">この要素に付けるコメント（任意）</div>
+            <textarea placeholder="例: 余白が広すぎる。上下 8px に詰めたい"></textarea>
+            <div class="row">
+              <span class="hint">送信: ⌘/Ctrl+Enter　キャンセル: Esc</span>
+              <button class="cancel">キャンセル</button>
+              <button class="primary">送信</button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.documentElement.appendChild(host);
+
+      const textarea = root.querySelector("textarea");
+      textarea.focus();
+
+      let settled = false;
+      function close(value) {
+        if (settled) return;
+        settled = true;
+        host.remove();
+        // パネルがスクリーンショットに写らないよう、消えたのを見届けてから返す
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve(value)));
+      }
+
+      root.querySelector(".primary").addEventListener("click", () => close(textarea.value));
+      root.querySelector(".cancel").addEventListener("click", () => close(null));
+      root.querySelector(".backdrop").addEventListener("mousedown", (ev) => {
+        if (ev.target === ev.currentTarget) close(null); // 背景クリックでキャンセル
+      });
+      host.addEventListener("keydown", (ev) => {
+        ev.stopPropagation(); // ページ側のショートカットに拾わせない
+        if (ev.key === "Escape") close(null);
+        if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) close(textarea.value);
+      });
+    });
   }
 
   function setCaptureMode(on) {
@@ -163,6 +239,18 @@
 
   document.addEventListener("mouseover", onMouseOver, true);
   document.addEventListener("click", onClick, true);
+  // 要素を選ぶ前に Esc でキャプチャモードを抜ける
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (captureMode && e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        setCaptureMode(false);
+      }
+    },
+    true
+  );
 
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg && msg.type === "dia-poc-toggle") {

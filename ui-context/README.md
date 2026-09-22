@@ -38,7 +38,11 @@ ui-context/
    常駐はさせていない。使うときに起動する。将来 launchd に載せる場合は `start.sh` が叩いている `capture_server.py` をそのまま plist の `ProgramArguments` にする。
 
 2. `dia://extensions`（Chrome は `chrome://extensions`）でデベロッパーモードを ON にし、`ui-context/extension/` を unpacked で読み込む
-3. 対象ページで `Alt+Shift+U`、またはツールバーの ui-context アイコンをクリックするとキャプチャモード。要素をクリックするとコメント入力（`prompt()`）の後、キャプチャディレクトリに書き出される
+3. 対象ページで `Alt+Shift+U`、またはツールバーの ui-context アイコンをクリックするとキャプチャモード。要素をクリックするとコメント入力のオーバーレイが出て、送信するとキャプチャディレクトリに書き出される
+
+   - 送信: `⌘/Ctrl+Enter` またはボタン。コメントは空でもよい
+   - キャンセル: `Esc` / 背景クリック / ボタン。キャンセルすると書き出さない
+   - 要素を選ぶ前なら `Esc` でキャプチャモードを抜ける
 
    拡張を入れる前から開いていたタブには content script が入っていないが、その場合は background が `chrome.scripting.executeScript` で注入してから再送するので、リロードしなくても動く。
 4. エージェント側は `/ui-context` スキル（dotfiles の `claude/skills/ui-context/`）で最新のキャプチャを読む
@@ -66,7 +70,6 @@ http(s) ページのみ対象。`file://` は content script が注入されな�
 
 - [ ] 本体 Dia の拡張画面から unpacked 読み込みして動作確認
 - [ ] 実セッションで `captureVisibleTab` が動くか確認。動かなければ画像なしで運用する
-- [ ] コメント入力を `prompt()` からオーバーレイ UI へ（v1 では見送り）
 - [ ] 溜まったキャプチャの掃除（今は消さない）
 
 ## test/
