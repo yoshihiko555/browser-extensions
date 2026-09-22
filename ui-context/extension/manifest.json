@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "ui-context",
+  "version": "0.1.0",
+  "description": "Select an element on a page and export its context (selector, HTML, CSS, screenshot, comment) to a local server for AI coding agents. PoC stage.",
+  "permissions": ["activeTab", "scripting", "commands"],
+  "host_permissions": ["http://127.0.0.1:*/", "<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "toggle-capture": {
+      "suggested_key": { "default": "Alt+Shift+U" },
+      "description": "Toggle element capture mode"
+    }
+  }
+}

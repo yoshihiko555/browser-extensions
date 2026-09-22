@@ -1,0 +1,5 @@
+.DS_Store
+*.log
+*.pid
+ui-context/captures/
+ui-context/profile*/
