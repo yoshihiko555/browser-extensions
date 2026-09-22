@@ -4,12 +4,34 @@ import { computeCropRect } from "./crop.js";
 const SERVER_URL = "http://127.0.0.1:8765/capture";
 
 chrome.commands.onCommand.addListener((command, tab) => {
-  if (command === "toggle-capture" && tab && tab.id) {
-    chrome.tabs.sendMessage(tab.id, { type: "dia-poc-toggle" }).catch((e) => {
-      console.warn("toggle-capture: could not message tab", e);
-    });
-  }
+  if (command === "toggle-capture") startCapture(tab);
 });
+
+// ショートカットが効かない環境向けの代替トリガー。ツールバーのアイコンから。
+chrome.action.onClicked.addListener((tab) => {
+  startCapture(tab);
+});
+
+async function startCapture(tab) {
+  const target = tab && tab.id ? tab : (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+  if (!target || !target.id) {
+    console.warn("ui-context: no target tab");
+    return;
+  }
+  try {
+    await chrome.tabs.sendMessage(target.id, { type: "dia-poc-toggle" });
+    return;
+  } catch (e) {
+    // content script が未注入のタブ（拡張を入れる前から開いていた等）はここに来る
+    console.info("ui-context: injecting content script into", target.url);
+  }
+  try {
+    await chrome.scripting.executeScript({ target: { tabId: target.id }, files: ["content.js"] });
+    await chrome.tabs.sendMessage(target.id, { type: "dia-poc-toggle" });
+  } catch (e) {
+    console.warn("ui-context: could not start capture on", target.url, e);
+  }
+}
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === "dia-poc-capture") {

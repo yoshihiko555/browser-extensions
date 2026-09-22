@@ -5,6 +5,9 @@
   "description": "Select an element on a page and export its context (selector, HTML, CSS, cropped screenshot, comment) to a local server for AI coding agents.",
   "permissions": ["activeTab", "scripting", "commands"],
   "host_permissions": ["http://127.0.0.1:*/", "<all_urls>"],
+  "action": {
+    "default_title": "ui-context: 要素を選択"
+  },
   "background": {
     "service_worker": "background.js",
     "type": "module"

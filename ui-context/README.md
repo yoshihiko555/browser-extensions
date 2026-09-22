@@ -38,7 +38,9 @@ ui-context/
    常駐はさせていない。使うときに起動する。将来 launchd に載せる場合は `start.sh` が叩いている `capture_server.py` をそのまま plist の `ProgramArguments` にする。
 
 2. `dia://extensions`（Chrome は `chrome://extensions`）でデベロッパーモードを ON にし、`ui-context/extension/` を unpacked で読み込む
-3. 対象ページで `Alt+Shift+U` を押すとキャプチャモード。要素をクリックするとコメント入力（`prompt()`）の後、キャプチャディレクトリに書き出される
+3. 対象ページで `Alt+Shift+U`、またはツールバーの ui-context アイコンをクリックするとキャプチャモード。要素をクリックするとコメント入力（`prompt()`）の後、キャプチャディレクトリに書き出される
+
+   拡張を入れる前から開いていたタブには content script が入っていないが、その場合は background が `chrome.scripting.executeScript` で注入してから再送するので、リロードしなくても動く。
 4. エージェント側は `/ui-context` スキル（dotfiles の `claude/skills/ui-context/`）で最新のキャプチャを読む
 
 http(s) ページのみ対象。`file://` は content script が注入されない（拡張設定で「ファイルの URL へのアクセスを許可」が必要）。
