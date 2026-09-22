@@ -86,7 +86,28 @@
     };
   }
 
-  function sendCapture(el, comment) {
+  function nextFrame() {
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  }
+
+  // 切り抜きは captureVisibleTab のビューポート画像が元なので、
+  // 要素が画面外・見切れている場合はスクロールして収めてから撮る。
+  async function ensureVisible(el) {
+    const r = el.getBoundingClientRect();
+    const fits =
+      r.top >= 0 &&
+      r.left >= 0 &&
+      r.bottom <= window.innerHeight &&
+      r.right <= window.innerWidth;
+    if (fits) return;
+    el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
+    // スクロール後の再描画を待つ
+    await nextFrame();
+    await nextFrame();
+  }
+
+  async function sendCapture(el, comment) {
+    await ensureVisible(el);
     const payload = buildPayload(el, comment);
     console.log("dia-poc: sending capture", payload.selector);
     chrome.runtime.sendMessage(
@@ -122,6 +143,8 @@
     e.preventDefault();
     e.stopPropagation();
     const el = e.target;
+    // ハイライトがスクリーンショットに写らないよう、先に解除する
+    setCaptureMode(false);
     let comment = "";
     try {
       comment = window.prompt("キャプチャに付けるコメント (任意):") || "";
@@ -129,12 +152,12 @@
       comment = "";
     }
     sendCapture(el, comment);
-    setCaptureMode(false);
   }
 
   function setCaptureMode(on) {
     captureMode = on;
     overlay.style.display = on ? overlay.style.display : "none";
+    if (!on) hoverEl = null;
     document.body && (document.body.style.cursor = on ? "crosshair" : "");
   }
 

@@ -1,17 +1,26 @@
 #!/usr/bin/env python3
-"""Minimal stdlib-only HTTP server for the Dia extension PoC.
+"""Minimal stdlib-only HTTP server for the ui-context extension.
 Listens on 127.0.0.1:8765, accepts POST /capture with JSON body,
-saves the JSON (minus screenshot) to captures/<ts>.json and the
-screenshot (if present, as a data URL) to captures/<ts>.png.
+saves the JSON (minus screenshot) to <captures>/<ts>.json and the
+screenshot (if present, as a data URL) to <captures>/<ts>.png.
+
+Captures go to a single global directory so the server does not need to
+know which project a capture belongs to:
+  ~/.local/share/ui-context/captures
+Override with the UI_CONTEXT_CAPTURES_DIR environment variable.
 """
 import base64
 import json
+import os
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-CAPTURES_DIR = Path(__file__).resolve().parent.parent / "captures"
-CAPTURES_DIR.mkdir(exist_ok=True)
+DEFAULT_CAPTURES_DIR = Path.home() / ".local" / "share" / "ui-context" / "captures"
+CAPTURES_DIR = Path(
+    os.environ.get("UI_CONTEXT_CAPTURES_DIR") or DEFAULT_CAPTURES_DIR
+).expanduser()
+CAPTURES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -81,6 +90,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     server = ThreadingHTTPServer(("127.0.0.1", 8765), Handler)
     print("[capture_server] listening on http://127.0.0.1:8765")
+    print(f"[capture_server] captures dir: {CAPTURES_DIR}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

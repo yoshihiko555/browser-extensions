@@ -1,33 +1,56 @@
 # ui-context
 
-ページ上の要素をクリックで選び、その文脈（CSS セレクタ、outerHTML、主要な computed style、位置、URL、任意コメント、スクリーンショット）をローカルサーバ経由でファイルに書き出す拡張。ターミナルで動く AI コーディングエージェント（Claude Code など）に「この要素を直して」を渡すための入口。ORCA の Design Mode を参考にしている。
+ページ上の要素をクリックで選び、その文脈（CSS セレクタ、outerHTML、主要な computed style、位置、URL、任意コメント、切り抜きスクリーンショット）をローカルサーバ経由でファイルに書き出す拡張。ターミナルで動く AI コーディングエージェント（Claude Code など）に「この要素を直して」を渡すための入口。ORCA の Design Mode を参考にしている。
 
-**状態: PoC。** 2026-09-22 に別プロファイルの Dia で実機検証済み。v1 の設計と残課題は末尾。
+**状態: v1。** 2026-09-22 に別プロファイルの Dia で PoC 検証済み。本体 Dia での動作確認は未実施（末尾の残課題）。
 
 ## 構成
 
 ```
 ui-context/
-├── extension/          MV3 拡張（manifest.json / background.js / content.js）
+├── extension/          MV3 拡張（manifest.json / background.js / content.js / crop.js）
 ├── server/
-│   └── capture_server.py   受け側。標準ライブラリのみ。127.0.0.1:8765
-├── test/               CDP 経由の自動検証スクリプトとテストページ
-└── captures/           書き出し先（gitignore）
+│   ├── capture_server.py   受け側。標準ライブラリのみ。127.0.0.1:8765
+│   ├── start.sh            サーバ起動（多重起動しない）
+│   └── stop.sh             サーバ停止
+└── test/               CDP 経由の実機検証スクリプトと単体テスト
 ```
 
-## 使い方（PoC）
+書き出し先はリポジトリの外。グローバルの 1 ディレクトリに集約する（サーバにプロジェクト判別を持たせない）。
+
+```
+~/.local/share/ui-context/captures/
+├── <timestamp>.json
+└── <timestamp>.png      切り抜き画像（撮れた場合）
+```
+
+環境変数 `UI_CONTEXT_CAPTURES_DIR` で変更できる。サーバの PID / ログは `~/.local/state/ui-context/`（`UI_CONTEXT_STATE_DIR` で変更可）。
+
+## 使い方
 
 1. サーバを起動する
 
    ```sh
-   python3 server/capture_server.py
+   ./server/stop.sh   # 止めるとき
+   ./server/start.sh  # 起動。すでに動いていれば何もしない
    ```
 
+   常駐はさせていない。使うときに起動する。将来 launchd に載せる場合は `start.sh` が叩いている `capture_server.py` をそのまま plist の `ProgramArguments` にする。
+
 2. `dia://extensions`（Chrome は `chrome://extensions`）でデベロッパーモードを ON にし、`ui-context/extension/` を unpacked で読み込む
-3. 対象ページで `Alt+Shift+U` を押すとキャプチャモード。要素をクリックするとコメント入力（`prompt()`）の後、`captures/<timestamp>.json`（と取れれば `.png`）に書き出される
-4. エージェント側は `captures/` の最新ファイルを読む
+3. 対象ページで `Alt+Shift+U` を押すとキャプチャモード。要素をクリックするとコメント入力（`prompt()`）の後、キャプチャディレクトリに書き出される
+4. エージェント側は `/ui-context` スキル（dotfiles の `claude/skills/ui-context/`）で最新のキャプチャを読む
 
 http(s) ページのみ対象。`file://` は content script が注入されない（拡張設定で「ファイルの URL へのアクセスを許可」が必要）。
+
+## 切り抜き画像
+
+`chrome.tabs.captureVisibleTab` はビューポート全体しか撮れないので、拡張側で選択要素だけに切り抜く。
+
+- 要素がビューポートに収まっていない場合、content script が `scrollIntoView` してから撮る
+- ハイライトのオーバーレイは撮影前に消す
+- background の service worker が `OffscreenCanvas` で切り抜く。矩形計算は `extension/crop.js` の `computeCropRect`（CSS px × `devicePixelRatio`、周囲 8px の余白、画像の外にはみ出す分は詰める）
+- 切り抜きに失敗した場合はビューポート全体のまま送る。どちらで保存されたかは JSON の `screenshotKind`（`element` / `viewport`）で分かる
 
 ## PoC で確認できたこと（Dia、Chromium 153 相当、別プロファイル）
 
@@ -37,21 +60,26 @@ http(s) ページのみ対象。`file://` は content script が注入されな�
 - `chrome.tabs.captureVisibleTab` は自動化環境では `image readback failed` になった。CDP の `Page.captureScreenshot` も同様に失敗しており、検証環境の GPU 制約と判断。実セッションでは未確認
 - Native Messaging は使わない。Dia のホスト配置先が Chrome と異なる（`~/Library/Application Support/Dia/NativeMessagingHosts/`）ため、ローカル HTTP の方が簡単
 
-## v1 に向けた設計（決定済み）
-
-- 書き出し先はグローバルの 1 ディレクトリ。サーバにプロジェクト判別を持たせない
-- エージェントへの受け渡しは手動のスラッシュコマンド（最新 N 件を読む）。自動添付は並列セッション時に宛先が決まらないので見送り
-- コメントはブラウザ側のオーバーレイで任意入力（空でも可）
-
 ## 残課題
 
 - [ ] 本体 Dia の拡張画面から unpacked 読み込みして動作確認
-- [ ] 実セッションで `captureVisibleTab` が動くか確認。動かなければ画像なしで v1
-- [ ] 常駐サーバの起動・停止手順（launchd か手動か）
-- [ ] コメント入力を `prompt()` からオーバーレイ UI へ
-- [ ] Claude Code 側のスラッシュコマンド
+- [ ] 実セッションで `captureVisibleTab` が動くか確認。動かなければ画像なしで運用する
+- [ ] コメント入力を `prompt()` からオーバーレイ UI へ（v1 では見送り）
+- [ ] 溜まったキャプチャの掃除（今は消さない）
 
 ## test/
+
+単体テスト:
+
+```sh
+node --test test/*.test.mjs
+```
+
+`test/cdp_*.mjs` は実機の Dia に繋ぐスクリプトなので、この glob では拾わない。
+
+- `test/crop_rect.test.mjs`: `computeCropRect` の境界条件
+
+実機検証（CDP）:
 
 - `test/cdp_check.mjs`: 拡張がロードされたかを CDP で確認
 - `test/cdp_capture_test2.mjs`: `test/testpage.html` を 8766 番で配信し、content script のイベントを発火させてサーバ着弾を確認
