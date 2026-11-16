@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Bookmark Sorter",
+  "version": "0.1.0",
+  "description": "ブックマークバーの各フォルダを、閲覧履歴の訪問回数が多い順に並び替える",
+  "permissions": ["bookmarks", "history", "storage"],
+  "action": {
+    "default_title": "ブックマークを並び替える",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}
