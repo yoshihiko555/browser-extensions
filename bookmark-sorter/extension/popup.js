@@ -59,6 +59,10 @@ async function run(type, label) {
 $('sort').addEventListener('click', () => run('sort', '並び替え'));
 $('undoLast').addEventListener('click', () => run('undoLast', '直前に戻す処理'));
 $('undoOriginal').addEventListener('click', () => run('undoOriginal', '初回の前に戻す処理'));
+$('openStructure').addEventListener('click', async () => {
+  await chrome.tabs.create({ url: chrome.runtime.getURL('structure.html') });
+  window.close();
+});
 
 refresh().catch((e) => {
   $('source').textContent = '';

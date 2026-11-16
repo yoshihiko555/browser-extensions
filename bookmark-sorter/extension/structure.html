@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Bookmark Sorter: 構成を反映</title>
+  <style>
+    body {
+      max-width: 720px;
+      margin: 24px auto;
+      padding: 0 16px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px;
+      color: #222;
+    }
+    h1 {
+      font-size: 18px;
+    }
+    section {
+      padding: 12px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .muted {
+      color: #666;
+      font-size: 13px;
+    }
+    .errors {
+      color: #d93025;
+    }
+    .outline {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      white-space: pre;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      padding: 8px 12px;
+      max-height: 420px;
+      overflow: auto;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+    button {
+      padding: 6px 12px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+    }
+    button.primary {
+      background: #4CAF50;
+      color: #fff;
+      border-color: #4CAF50;
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+    #status.error {
+      color: #d93025;
+    }
+  </style>
+</head>
+<body>
+  <h1>構成を反映</h1>
+  <p class="muted">構成ファイル（bookmark-sorter/structure@1）に沿って、フォルダの作成・移動・名前変更と、ブックマークの移動を行います。何も削除しません。反映後は、ポップアップの「並び替える」でフォルダの中を並べ直してください。</p>
+
+  <section>
+    <input type="file" id="file" accept=".json,application/json">
+  </section>
+
+  <section id="result" hidden>
+    <div id="summary"></div>
+    <ul class="errors" id="errors"></ul>
+    <p class="muted">反映後のフォルダ構成（括弧内はブックマークの件数）</p>
+    <div class="outline" id="outline"></div>
+  </section>
+
+  <section>
+    <div class="actions">
+      <button class="primary" id="apply" disabled>反映する</button>
+      <button id="undo" disabled>構成を元に戻す</button>
+    </div>
+    <p class="muted">「構成を元に戻す」は、最初に反映する前のフォルダ構成と並びに戻し、このとき作ったフォルダは空なら消します。</p>
+    <p id="status"></p>
+  </section>
+  <script type="module" src="structure-page.js"></script>
+</body>
+</html>

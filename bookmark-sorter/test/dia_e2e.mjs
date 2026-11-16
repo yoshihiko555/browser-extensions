@@ -1,6 +1,8 @@
 // 検証用プロファイルの Dia で拡張を通しで動かす。node test/dia_e2e.mjs [port]
 // 前提: open -na Dia --args --user-data-dir=<別ディレクトリ> --remote-debugging-port=9226 --load-extension=<extension の絶対パス>
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 const PORT = process.argv[2] || 9226;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -33,14 +35,11 @@ const ws = new WebSocket(ver.webSocketDebuggerUrl);
 await new Promise((r) => ws.addEventListener('open', r));
 console.log('browser:', ver.Browser);
 
-// 拡張の service worker を名前で探す（Dia 純正の内部拡張が混在する）
-let extId;
-for (const t of (await rpc(ws, 'Target.getTargets')).targetInfos.filter((t) => t.type === 'service_worker')) {
-  const { sessionId } = await rpc(ws, 'Target.attachToTarget', { targetId: t.targetId, flatten: true });
-  const name = await evaluate(ws, sessionId, 'chrome.runtime.getManifest().name').catch(() => null);
-  if (name === 'Bookmark Sorter') extId = new URL(t.url).host;
-}
-assert.ok(extId, 'Bookmark Sorter の service worker が見つからない');
+// unpacked 拡張の ID は読み込んだディレクトリの絶対パスから決まる（service worker は止まっていることがある）
+const extDir = fileURLToPath(new URL('../extension', import.meta.url));
+const extId = [...createHash('sha256').update(extDir).digest('hex').slice(0, 32)]
+  .map((h) => String.fromCharCode(97 + parseInt(h, 16)))
+  .join('');
 
 const { targetId } = await rpc(ws, 'Target.createTarget', { url: `chrome-extension://${extId}/popup.html` });
 const { sessionId: page } = await rpc(ws, 'Target.attachToTarget', { targetId, flatten: true });
@@ -53,6 +52,10 @@ const send = async (type) => {
 };
 
 console.log('chrome.history:', await ev('typeof chrome.history?.search'));
+
+// 履歴の全削除などをするので、普段のプロファイルらしければ中止する
+const historySize = await ev(`chrome.history.search({ text: '', startTime: 0, maxResults: 2000 }).then((r) => r.length)`);
+assert.ok(historySize < 1000, `履歴が ${historySize} 件あるため中止します（検証用プロファイルで実行しているか確認）`);
 
 // 合成データを投入
 const folderId = await ev(`(async () => {
